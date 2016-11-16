@@ -1,0 +1,681 @@
+---
+title: "Evolution of Avr genes in Phytophthora infestans, P ipomoeae and P mirabilis"
+author: "Shankar K Shakya"
+date: "November 9, 2016"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(ggplot2)
+library(dplyr)
+library(vcfR, quietly = TRUE)
+library(pegas, quietly = TRUE)
+library(ape)
+```
+
+# Avirulence genes in Phytophthora infestans
+
+A number of avirulence genes have been identified and cloned till date from Phytophthora species. These avr genes primarily belong to RXLR class effectors. These effectors are important as they confer resistance when a matching R gene is present in host plant.
+
+Breadth of coverage (1x coverage divided by gene length) of 0.8 is used as a cutoff to call gene presence/absence. First a matrix of BOC is produced for effector genes and this matrix is subsetted to just the 42 listed avr genes.
+
+
+```{r, include=FALSE}
+
+rm(list = ls())
+pitg_cov <- read.csv("pitg_coverage.csv", header = TRUE)
+pitg_cov <- subset(pitg_cov, select = -c(X90128_1x.cov, P1362_1x.cov,
+                    pic99189_1x.cov))
+
+```
+
+
+```{r, include=FALSE}
+
+cov_1x <- pitg_cov[, grep("_1x.cov$", colnames(pitg_cov))] / pitg_cov$LENGTH
+cov_1x[cov_1x <= 0.8] <- NA 
+cov_1x <- cbind(pitg_cov[,1:12], cov_1x)
+cov_1x <- cbind(cov_1x, pitg_cov[, grep("^is.", colnames(pitg_cov))])
+
+```
+
+```{r, include=FALSE}
+
+gene_categories<- grep("^is.", colnames(pitg_cov))
+gene_categories <- colnames(pitg_cov[gene_categories])
+
+name_list <- strsplit(gene_categories, "is.")
+name_list <- sapply(name_list, function(x) x[2])
+
+```
+
+
+```{r, include=FALSE}
+
+PITG_foundin_all_samples <- vector('list', length = length(gene_categories))
+names(PITG_foundin_all_samples) <- name_list
+
+for (k in 1:length(gene_categories)){
+  
+  category_PITG <- subset(cov_1x, cov_1x[gene_categories[k]] == TRUE)
+  
+  category_mat <- as.matrix(category_PITG[1:nrow(category_PITG), grep("_1x.cov$",            
+                colnames(category_PITG))])
+  
+  category_list <- category_PITG$LOCUS
+  rownames(category_mat) <- category_list
+  
+  index <- row.names(cov_1x) %in% category_list
+  
+  name <- name_list[k]
+  
+  PITG_foundin_all_samples[[k]] <- category_mat
+  
+  
+list <- c("t30.4_1x.cov", "X1306_1_1x.cov", "X1306_2_1x.cov", "X1306_3_1x.cov", "NL07434_1x.cov","blue13A_1x.cov", "P12204_1x.cov", "P6096_1x.cov", "LBUS5_1x.cov", "P11633_1x.cov", "DDR7602_1x.cov",  "P13527_1x.cov", "P13626_1x.cov", "RS2009P1_us8_1x.cov","us8_1x.cov", "us11_1x.cov", "P10127_1x.cov", "IN2009T1_us22_1x.cov", "us22_1x.cov", "P17777us22A_1x.cov", "BL2009P4_us23_1x.cov", "us23_1x.cov", "us24_1x.cov",  "inf1_1x.cov", "inf2_1x.cov", "inf3_1x.cov", "inf4_1x.cov", "inf5_1x.cov", "inf6_1x.cov", "P10650_1x.cov", "ipo1_1x.cov", "ipo2_1x.cov", "ipo3_1x.cov", "ipo4_1x.cov", "ipo5_1x.cov", "mir1_1x.cov", "mir2_1x.cov",   "mir3_1x.cov", "mir4_1x.cov", "mir5_1x.cov", "P7722_1x.cov")
+
+category_mat <- category_mat[,list]
+  
+morder <- sort.int(apply(category_mat[,grep("mir|ipo|P7722", colnames(category_mat), invert = FALSE)], MARGIN=1, function(x){sum(is.na(x))}), index.return = TRUE)$ix
+
+  # heatmap.bp(category_mat[morder,], rlabels = FALSE)
+  # title(main = paste(name, "presence_absence", nrow(category_mat), outer = TRUE))
+
+  assign(paste(name, "presence_absence_mat" , sep = "_"), as.matrix(category_mat)) 
+  
+}
+
+```
+
+
+### Presence absence polymorphism in Phytophthora Avr genes.
+
+1. At least 10 genes are found in all samples (cutoff = 0.8). 
+2. More gene absences in P ipomoeae compare to P mirabilis. Most of Avrblb2 genes are absent.
+3. Two Avr3a genes absent in both P ipo and P mir but present in all P inf.
+
+
+```{r, echo=FALSE, fig.align="center", fig.height=16, fig.width=12}
+
+avr_genes <- read.table(file = "../AVR_list.txt", header = TRUE, sep = "\t")
+
+pitglist <- as.character(avr_genes$PITGs)
+
+avr_rxlr <- Effector_presence_absence_mat[rownames(Effector_presence_absence_mat) %in% pitglist, ]
+
+final_avr_genes <- avr_genes[avr_genes$PITGs %in% rownames(avr_rxlr), ]
+
+
+for (k in 1:length(final_avr_genes$PITGs)){
+      temp <- subset(final_avr_genes, rownames(avr_rxlr)[k] == final_avr_genes$PITGs )
+      rownames(avr_rxlr)[k] <- paste(temp[1,1], rownames(avr_rxlr)[k], sep = "_")
+      
+}
+
+avr_rxlr_sorted <- avr_rxlr[order(rownames(avr_rxlr)), ] 
+
+split <- strsplit(colnames(avr_rxlr_sorted), split = "_")
+sample_names <- sapply(split, function(x) x[1])
+sample_names[2:4] <- c("1306_1", "1306_2", "1306_3")
+
+
+colnames(avr_rxlr_sorted) <- sample_names
+
+library(vcfR, quietly = TRUE)
+#heatmap.bp(avr_rxlr_sorted, col.ramp = viridisLite::viridis(n = 5, alpha = 1)) 
+
+avr_PA <- avr_rxlr_sorted[apply(avr_rxlr_sorted, MARGIN=1, function(x){ sum(is.na(x)) > 0 }),]
+avr_present_inall <- setdiff(rownames(avr_rxlr_sorted), rownames(avr_PA))
+
+
+```
+
+
+### VCF to sequences
+
+```{r}
+
+library(pegas, quietly = TRUE)
+
+split <- strsplit(avr_present_inall, split = "PITG")
+pitg <- sapply(split, function(x) x[2])
+
+pitg2seq <- paste("PITG", pitg, sep = "") 
+
+all_PITG <- list.files("Bedified_INF_IPO_MIR/") #list of vcfs for each PITG
+
+dna <- ape::read.dna(file = "phytophthora_infestans_t30-4_1_genes.fasta", format="fasta") # this file has PITG sequences and will be used downstream to generate reference sequence.
+
+pitg_cov <- read.csv("pitg_coverage.csv", header = TRUE) # this file has coordinates for each PITG
+
+
+mybin <- vector("list", length(pitg2seq))
+trees <- vector("list", length(pitg2seq)) 
+
+names(trees) <- pitg2seq
+names(mybin) <- pitg2seq
+
+source("vcfR2DNAbin.R")
+
+for (j in 1:length(pitg2seq)){
+  k <- grep(pitg2seq[j], all_PITG)
+  
+  #cat("\nGene: ", all_PITG[k], "\n")
+
+  PITG_vcf <- read.vcfR(file.path("Bedified_INF_IPO_MIR/", all_PITG[k]), verbose = FALSE)
+
+  #cat("nrow: ", nrow(PITG_vcf), "\n")
+  
+  if( nrow(PITG_vcf) > 0 ){
+  
+    seq <- dna[k]
+    
+    my_dnabin <- vcfR2DNAbin(PITG_vcf, consensus = FALSE, extract.haps = TRUE, gt.split = "/", 
+                             ref.seq = seq, start.pos = pitg_cov[k,3])
+    
+    rm.tip <- c("90128_0", "90128_1", "P1362_0", "P1362_1", "pic99189_0", "pic99189_1")
+    
+    my_dnabin <- my_dnabin[!rownames(my_dnabin) %in% rm.tip, ]
+    
+    mybin[[j]] <- my_dnabin
+    
+    my_dist <- ape::dist.dna(my_dnabin, variance = TRUE)
+    
+    trees[[j]] <- ape::nj(my_dist)
+    
+    
+    
+  }
+  
+}
+
+
+```
+
+
+## Removing trees with no variants and plotting individual trees.
+
+```{r, fig.align="center", fig.width=12, fig.height=12}
+
+library(ape)
+trees <- trees[lapply(trees, length) > 0]
+
+k <- 1
+  colv <- rep(1, times=length(trees[[k]]$tip.label))
+  colv[grep("mir|P7722", trees[[k]]$tip.label)] <-"#E41A1C"
+  colv[grep("ipo", trees[[k]]$tip.label)] <- "#377EB8"
+  colv[grep("inf|P10650", trees[[k]]$tip.label)] <- "#4DAF4A"
+  colv[grep("us|P10127|IN2009T1|RS2009P1|BL2009",trees[[k]]$tip.label)] <- "#984EA3"
+  colv[grep("P13527|P13626", trees[[k]]$tip.label)] <- "#FF7F00"
+  colv[grep("blue|P12204|NL07434", trees[[k]]$tip.label)] <-  "#3FFF33"
+  colv[grep("P6096|LB|P11633|DDR", trees[[k]]$tip.label)] <-  "#A65628"
+
+  
+for (i in 1:length(trees)){
+  plot(root(trees[[i]], outgroup = "mir1_0"), tip.color = colv, main = names(trees[i]))
+  add.scale.bar(cex = 0.8, font = 2, col = "black")
+
+}
+
+```
+
+## Nucleotide diversity for selected Avr genes and control genes
+
+```{r, fig.align="center", fig.width=12, fig.height=12}
+
+groupings <- c("clonal", "us1", "pinf_mx", "pinf_euro", "pmir", "pipo")
+avr_nt_div_mat <- matrix(NA, length(mybin), length(groupings))
+rownames(avr_nt_div_mat) <- names(mybin)
+colnames(avr_nt_div_mat) <- groupings
+
+k <- 1
+
+for (k in 1:length(mybin)){
+  seq <- mybin[[k]]
+
+  clonal <- nuc.div(seq[grep("us|P10127|IN2009T1|RS2009P1|BL2009", rownames(seq)), ])
+  us1 <- nuc.div(seq[grep("P6096|LB|P11633|DDR", rownames(seq)), ])
+  pinf_mx <- nuc.div(seq[grep("inf|P10650", rownames(seq)), ])
+  pinf_euro <- nuc.div(seq[grep("blue|P12204|NL07434", rownames(seq)), ])
+  pmir <- nuc.div(seq[grep("mir|P7722", rownames(seq)), ])
+  pipo <- nuc.div(seq[grep("ipo", rownames(seq)), ])
+  
+  avr_nt_div_mat[k,1] <- clonal
+  avr_nt_div_mat[k,2] <- us1
+  avr_nt_div_mat[k,3] <- pinf_mx
+  avr_nt_div_mat[k,4] <- pinf_euro
+  avr_nt_div_mat[k,5] <- pmir
+  avr_nt_div_mat[k,6] <- pipo
+
+}
+
+library(forcats)
+library(reshape2)
+
+melt_avr_nt_div_mat <- melt(avr_nt_div_mat)
+
+
+dat1 <- ggplot(melt_avr_nt_div_mat, aes(x=fct_inorder(Var2), y = value)) + geom_boxplot() + labs(title = "Nucleotide diversity for conserved Avr genes")
+
+
+```
+
+
+
+### Nucleotide diversity for control genes (Javier's list)
+
+```{r, fig.align="center", fig.width=16, fig.height=12}
+
+
+javier_pitg <- c("PITG_01255", "PITG_03156", "PITG_01062", "PITG_00062", "PITG_03783", "PITG_03523", "PITG_06454", "PITG_17490", "PITG_00271", "PITG_06664", "PITG_01335", "PITG_09940", "PITG_01290", "PITG_11702", "PITG_01255", "PITG_02430", "PITG_06906", "PITG_16327", "PITG_15642", "PITG_03898")  
+
+
+control_genes <- rownames(Core_presence_absence_mat[rownames(Core_presence_absence_mat) %in% javier_pitg, ])
+
+control_genes <- control_genes[1:10]
+
+
+all_PITG <- list.files("Bedified_INF_IPO_MIR/") 
+dna <- ape::read.dna(file = "phytophthora_infestans_t30-4_1_genes.fasta", format="fasta") 
+pitg_cov <- read.csv("pitg_coverage.csv", header = TRUE) 
+
+
+control_mybin <- vector("list", length(control_genes))
+control_trees <- vector("list", length(control_genes)) 
+
+names(control_mybin) <- control_genes
+names(control_trees) <- control_genes
+
+source("vcfR2DNAbin.R")
+
+
+for (j in 1:length(control_genes)){
+  k <- grep(control_genes[j], all_PITG)
+  
+  #cat("\nGene: ", all_PITG[k], "\n")
+
+  PITG_vcf <- read.vcfR(file.path("Bedified_INF_IPO_MIR/", all_PITG[k]), verbose = FALSE)
+
+  #cat("nrow: ", nrow(PITG_vcf), "\n")
+  
+  if( nrow(PITG_vcf) > 0 ){
+  
+    seq <- dna[k]
+    
+    my_dnabin <- vcfR2DNAbin(PITG_vcf, consensus = FALSE, extract.haps = TRUE, gt.split = "/", 
+                             ref.seq = seq, start.pos = pitg_cov[k,3])
+    
+    rm.tip <- c("90128_0", "90128_1", "P1362_0", "P1362_1", "pic99189_0", "pic99189_1")
+    
+    my_dnabin <- my_dnabin[!rownames(my_dnabin) %in% rm.tip, ]
+    
+    control_mybin[[j]] <- my_dnabin
+    
+    my_dist <- ape::dist.dna(my_dnabin, variance = TRUE)
+    
+    control_trees[[j]] <- ape::nj(my_dist)
+    
+  }
+  
+}
+
+
+groupings <- c("clonal", "us1", "pinf_mx", "pinf_euro", "pmir", "pipo")
+control_nt_div_mat <- matrix(NA, length(control_genes), length(groupings))
+rownames(control_nt_div_mat) <- control_genes
+colnames(control_nt_div_mat) <- groupings
+
+
+for (k in 1:length(control_mybin)){
+  seq <- control_mybin[[k]]
+
+  clonal <- nuc.div(seq[grep("us|P10127|IN2009T1|RS2009P1|BL2009", rownames(seq)), ])
+  us1 <- nuc.div(seq[grep("P6096|LB|P11633|DDR", rownames(seq)), ])
+  pinf_mx <- nuc.div(seq[grep("inf|P10650", rownames(seq)), ])
+  pinf_euro <- nuc.div(seq[grep("blue|P12204|NL07434", rownames(seq)), ])
+  pmir <- nuc.div(seq[grep("mir|P7722", rownames(seq)), ])
+  pipo <- nuc.div(seq[grep("ipo", rownames(seq)), ])
+  
+  control_nt_div_mat[k,1] <- clonal
+  control_nt_div_mat[k,2] <- us1
+  control_nt_div_mat[k,3] <- pinf_mx
+  control_nt_div_mat[k,4] <- pinf_euro
+  control_nt_div_mat[k,5] <- pmir
+  control_nt_div_mat[k,6] <- pipo
+
+}
+
+
+library(forcats)
+library(reshape2)
+
+melt_control_nt_div_mat <- melt(control_nt_div_mat)
+
+#ggplot(dat, aes(x=fct_inorder(groupings), y = value)) + geom_bar(stat = "identity") + facet_grid(variable~., scales = "free") + labs(title = "Nucleotide diversity for control genes")
+
+#ggplot(dat2, aes(x=fct_inorder(groupings), y = value)) + geom_boxplot() + labs(title = "Nucleotide diversity for control genes")
+
+dat2 <- ggplot(melt_control_nt_div_mat, aes(x=fct_inorder(Var2), y = value)) + geom_boxplot() + labs(title = "Nucleotide diversity for control genes")
+
+dat2
+
+library(dplyr)
+
+observe1 <- rbind(
+  mutate(melt_avr_nt_div_mat, category = "AVR genes"),
+  mutate(melt_control_nt_div_mat, category = "Control genes")
+)
+
+
+
+ggplot(observe1, aes(x=fct_inorder(Var2), y = value, fill = factor(Var2))) + geom_boxplot() + facet_wrap(~category) + 
+labs(title = "Nucleotide diversity for Avr and Control genes", x = "Group", y = "Nucleotide diversity") + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 16)) +
+  theme(strip.text = element_text(size = 20))
+
+
+
+```
+
+
+## Heterozygosity in avr genes
+
+```{r Heterozygosity, echo=FALSE, fig.align="center", fig.height=12, fig.width=12}
+
+effector_nt_div <- read.table("Nucleotide diversity matrices/Effector_nt_div_mat")
+
+conseved_avr <- pitg2seq
+
+avr_het <- effector_nt_div[rownames(effector_nt_div) %in% conseved_avr , ]
+
+groupings <-  c("clonal", "us1", "pinf_mx", "pinf_euro", "pmir", "pipo")
+
+avr_het_mat <- matrix(NA, length(groupings), nrow(avr_het))
+rownames(avr_het_mat) <- groupings
+colnames(avr_het_mat) <- rownames(avr_het)
+
+
+for (i in 1:nrow(avr_het)) {
+ 
+  clonal <- rowMeans(avr_het[i, grep("us|P10127|IN2009T1|RS2009P1|BL2009" , colnames(avr_het))]) 
+  us1  <- rowMeans(avr_het[i, grep("P6096|LB|P11633|DDR" , colnames(avr_het))])
+  pinf_mx <- rowMeans(avr_het[i, grep("inf|P10650" , colnames(avr_het))]) 
+  pinf_euro <- rowMeans(avr_het[i, grep("blue|P12204|NL07434" , colnames(avr_het))])
+  pmir <- rowMeans(avr_het[i, grep("mir|P7722" , colnames(avr_het))])
+  pipo <- rowMeans(avr_het[i, grep("ipo" , colnames(avr_het))])
+  
+  
+  avr_het_mat[1,i] <- clonal
+  avr_het_mat[2,i] <- us1
+  avr_het_mat[3,i] <- pinf_mx
+  avr_het_mat[4,i] <- pinf_euro
+  avr_het_mat[5,i] <- pmir
+  avr_het_mat[6,i] <- pipo
+ 
+}
+
+avr_het_mat <- melt(avr_het_mat)
+
+#ggplot(avr_het_mat, aes(x=fct_inorder(Var1), y = value)) + geom_bar(stat = "identity") + facet_grid(Var2~., scales = "free")
+
+#ggplot(avr_het_mat, aes(x=fct_inorder(Var1), y = value)) + geom_jitter()
+
+p1 <- ggplot(avr_het_mat, aes(x=fct_inorder(Var1), y = value)) + geom_boxplot() + labs(title = "Heterozygosity for conserved Avr genes")
+p1
+
+```
+
+## Heterozygosity for control genes
+
+```{r, echo=FALSE, fig.align="center", fig.height=12, fig.width=16}
+
+core_nt_div <- read.table("Nucleotide diversity matrices/core_nt_div_mat")
+
+#javier_pitg <- c("PITG_01255", "PITG_03156", "PITG_01062", "PITG_00062", "PITG_03783", "PITG_03523", "PITG_06454", "PITG_17490", "PITG_00271", "PITG_06664", "PITG_01335", "PITG_09940", "PITG_01290", "PITG_11702", "PITG_01255", "PITG_02430", "PITG_06906", "PITG_16327", "PITG_15642", "PITG_03898")  
+
+
+#control_genes <- rownames(Core_presence_absence_mat[rownames(Core_presence_absence_mat) %in% javier_pitg, ])
+
+
+control_het <- core_nt_div[rownames(core_nt_div) %in% control_genes , ]
+
+groupings <-  c("clonal", "us1", "pinf_mx", "pinf_euro", "pmir", "pipo")
+
+control_het_mat <- matrix(NA, length(groupings), nrow(control_het))
+rownames(control_het_mat) <- groupings
+colnames(control_het_mat) <- rownames(control_het)
+
+
+for (i in 1:nrow(control_het)) {
+  
+  clonal <- rowMeans(control_het[i, grep("us|P10127|IN2009T1|RS2009P1|BL2009" , colnames(control_het))])
+  us1 <- rowMeans(control_het[i, grep("P6096|LB|P11633|DDR" , colnames(control_het))])
+  pinf_mx <- rowMeans(control_het[i, grep("inf|P10650" , colnames(control_het))])
+  pinf_euro <- rowMeans(control_het[i, grep("blue|P12204|NL07434" , colnames(control_het))])
+  pmir <- rowMeans(control_het[i, grep("mir|P7722" , colnames(control_het))])
+  pipo <- rowMeans(control_het[i, grep("ipo" , colnames(control_het))])
+  
+  
+  control_het_mat[1,i] <- clonal
+  control_het_mat[2,i] <- us1
+  control_het_mat[3,i] <- pinf_mx
+  control_het_mat[4,i] <- pinf_euro
+  control_het_mat[5,i] <- pmir
+  control_het_mat[6,i] <- pipo
+ 
+}
+
+control_het_mat <- melt(control_het_mat)
+
+p2 <- ggplot(control_het_mat, aes(x=fct_inorder(Var1), y = value)) + geom_boxplot() + labs(title = "Heterozygosity for control genes")
+p2
+
+
+observe2 <- rbind(
+  mutate(avr_het_mat, category = "AVR genes"),
+  mutate(control_het_mat, category = "Control genes")
+)
+
+ggplot(observe2, aes(x=fct_inorder(Var1), y = value, fill = Var1)) + geom_boxplot() +   
+facet_wrap(~category) + 
+labs(title = "Heterozygosity for Avr and Control genes", x = "Group", y = "Heterozygosity") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 20)) +
+theme(axis.text.y = element_text(size = 20)) +
+theme(strip.text = element_text(size = 20)) +
+theme(plot.title = element_text(size = 40))
+
+```
+
+
+## Assigning RXLR family to each PITG in RXLR category based on Haas et. al
+
+```{r}
+
+rxlr_family <- read.csv("RXLR_family_haas.csv", header = TRUE)
+
+renamed_RxLR_presence_absence_mat <- RxLR_presence_absence_mat
+
+#k <- 1
+for (k in 1:nrow(renamed_RxLR_presence_absence_mat)){
+  temp <- rxlr_family[rownames(renamed_RxLR_presence_absence_mat)[k] == rxlr_family$Acc, ][1,1]
+  
+  #rownames(RxLR_presence_absence_mat)[k] <- paste(temp, rownames(RxLR_presence_absence_mat)[k], sep = "_")
+  rownames(renamed_RxLR_presence_absence_mat)[k] <- paste(temp)
+  
+}
+
+sorted_renamed_RxLR_presence_absence_mat <- renamed_RxLR_presence_absence_mat[order(rownames(renamed_RxLR_presence_absence_mat)), ]
+
+rxlr_pa <- sorted_renamed_RxLR_presence_absence_mat[apply(sorted_renamed_RxLR_presence_absence_mat, MARGIN=1, function(x){ sum(is.na(x)) > 0 }),]
+
+unique_fami <- unique(rownames(rxlr_pa))
+
+ind_fami <- vector("list", length(unique_fami))
+names(ind_fami) <- unique_fami
+
+
+gene_poly_perfamily <- as.data.frame(x = NA)
+
+
+for (k in 1:length(unique_fami)){
+  
+    fami_mat <- rxlr_pa[rownames(rxlr_pa) == unique_fami[k], , drop = FALSE] 
+    gene_poly_perfamily[k, ] <- nrow(fami_mat) 
+    ind_fami[[k]] <- fami_mat 
+    
+   
+}
+
+rownames(gene_poly_perfamily) <- unique_fami
+
+gene_poly_perfamily <- cbind(rownames(gene_poly_perfamily), gene_poly_perfamily)
+rownames(gene_poly_perfamily) <- NULL
+colnames(gene_poly_perfamily) <- c("Gene family", "P/A")
+
+gene_poly_perfamily <- gene_poly_perfamily[order(gene_poly_perfamily$`P/A`, decreasing = TRUE), ]
+
+gene_poly_perfamily
+
+#heatmap.bp(ind_fami[[1]])
+
+
+```
+
+
+## Ramos-Onsins–Rozas Test of Neutrality
+
+```{r}
+
+mybin #dnabin of avr genes
+control_mybin # dnabin of control genes
+
+length(mybin)
+length(control_mybin)
+
+avr_tajima_mat <- matrix(NA, nrow = length(mybin), ncol = 3)
+rownames(avr_tajima_mat) <- names(mybin)
+colnames(avr_tajima_mat) <- c("Tajima's D", "Pvalue", "Segregating sites")
+avr_tajima_mat
+
+for (i in 1:length(mybin)){
+  tajima <- tajima.test(mybin[[i]])
+  avr_tajima_mat[i,1] <- tajima$D
+  avr_tajima_mat[i,2] <- tajima$Pval.normal
+  avr_tajima_mat[i,3] <- length(seg.sites(mybin[[i]]))
+  
+   #print(theta.s(mybin[[i]]))
+  
+}
+
+
+
+control_tajima_mat <- matrix(NA, nrow = length(control_mybin), ncol = 4)
+rownames(control_tajima_mat) <- names(control_mybin)
+colnames(control_tajima_mat) <- c("Tajima's D", "Pvalue", "Segregating sites", "gene length")
+control_tajima_mat
+
+for (i in 1:length(control_mybin)){
+  tajima <- tajima.test(control_mybin[[i]])
+  
+  control_tajima_mat[i,1] <- tajima$D
+  control_tajima_mat[i,2] <- tajima$Pval.normal
+  control_tajima_mat[i,3] <- length(seg.sites(control_mybin[[i]]))
+  control_tajima_mat[i,4] <- ncol(mybin[[i]])
+}
+
+control_tajima_mat
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## dN dS 
+
+```{r, eval=FALSE, include=FALSE}
+
+dna_seq <- mybin[[10]]
+dna_seq
+
+aa_seq <- trans(dna_seq)
+aa_seq
+
+seg.sites(aa_seq)
+
+ape::image.DNAbin(my_dnabin[,ape::seg.sites(aa_seq)])
+
+plot(alview(aa_seq))
+
+alex(dna_seq)
+
+checkAlignment(dna_seq)
+```
+
+
+
+```{r}
+
+
+mybin[[1]]
+str(mybin[[1]])
+
+library(mmod)
+x <- as.genind.DNAbin(mybin[[1]], pops = labels(mybin[[1]]))
+class(x)
+
+x <- genind2gtypes(x)
+
+obsvdHet(x)
+
+
+allelicRichness(x)
+
+
+y <- as.genind.DNAbin(control_mybin[[1]], pops = labels(control_mybin[[1]]))
+y <- genind2gtypes(y)
+
+allelicRichness(y)
+
+
+haplotypeLikelihoods(control_mybin[[1]])
+
+
+LDgenepop(x)
+
+```
+
+
+
+
+
+
+
+
+
+
+
