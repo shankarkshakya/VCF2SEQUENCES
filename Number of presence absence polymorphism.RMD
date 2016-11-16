@@ -1,0 +1,279 @@
+---
+title: "Number of true absent genes"
+author: "Shankar K Shakya"
+date: "October 20, 2016"
+output: word_document
+---
+
+
+## Number of true absent genes
+Previously I have produced heatmaps showing presence absence polymorphism. Here I am quantifying the number of absent genes, which is basically counting the number of NAs from presence absence polymorphism matrix. Beside that I have got rid of those genes that had no start and stop codon.
+
+```{r, echo=TRUE, fig.align="center", fig.height=12, fig.width=12, global_options, echo=FALSE}
+
+rm(list=ls())
+library(vcfR)
+library(ggplot2)
+
+false_gene_mat_list <- list.files("FALSE GENE MATRICES/")
+#false_gene_mat_list
+
+pre_abs_mat_list <- list.files("PITG presence absence matrices/")
+#pre_abs_mat_list
+
+name_list <- strsplit(false_gene_mat_list, "_")
+name_list <- sapply(name_list, function(x) x[1])
+name_list
+
+k <- 1
+for (k in 1:length(pre_abs_mat_list)){
+  
+false_gene_mat <- read.table(file.path("FALSE GENE MATRICES/", false_gene_mat_list[k]))
+
+pre_abs_mat <- as.matrix(read.table(file.path("PITG presence absence matrices/", pre_abs_mat_list[k])))
+
+pre_abs_except_falsegenes <- setdiff(rownames(pre_abs_mat), false_gene_mat$LOCUS)
+
+pre_abs_except_falsegenes_mat <- as.matrix(pre_abs_mat[rownames(pre_abs_mat) %in% pre_abs_except_falsegenes, ])
+
+
+morder <- sort.int(apply(pre_abs_except_falsegenes_mat[,grep("mir|ipo|P7722", colnames(pre_abs_except_falsegenes_mat), invert = FALSE)], MARGIN=1, function(x){sum(is.na(x))}), index.return = TRUE)$ix
+
+name <- name_list[k]
+
+  heatmap.bp(pre_abs_except_falsegenes_mat[morder,], rlabels = FALSE)
+  title(main = paste(name, "presence_absence_no_false_genes", nrow(pre_abs_except_falsegenes_mat),"/",nrow(pre_abs_mat)), outer = TRUE)
+
+assign(paste(name, "presence_absence_no_false_genes", sep = "_"), as.matrix(pre_abs_except_falsegenes_mat))
+
+}
+
+cazy <- as.data.frame(apply(CAZy_presence_absence_no_false_genes, 2, function(x)
+        length(which(is.na(x)))))
+colnames(cazy) <- "cazy_P/A"
+
+core <- as.data.frame(apply(Core_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(core) <- "core_P/A"
+
+crn <- as.data.frame(apply(CRN_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(crn) <- "CRN_P/A"
+
+effector <- as.data.frame(apply(Effector_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(effector) <- "effector_P/A"
+
+rxlr <- as.data.frame(apply(RxLR_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(rxlr) <- "rxlr_P/A"
+
+scr <- as.data.frame(apply(SCR_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(scr) <- "scr_P/A"
+
+elicitin <- as.data.frame(apply(elicitin_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(elicitin) <- "elicitin_P/A"
+
+pseudo <- as.data.frame(apply(pseudo_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(pseudo) <- "pseudo_P/A"
+
+
+npp <- as.data.frame(apply(NPP1_presence_absence_no_false_genes, 2, function(x) length(which(is.na(x)))))
+colnames(npp) <- "NPP1_P/A"
+
+prs_abs <- cbind(cazy, core, crn, effector, rxlr, scr, elicitin, pseudo, npp)
+#prs_abs
+
+absent_num <- apply(prs_abs, MARGIN = 1, sum)
+head(absent_num)
+
+split <- strsplit(names(absent_num), split = "_")
+sample_names <- sapply(split, function(x) x[1])
+sample_names[1:3] <- c("1306_1", "1306_2", "1306_3")
+head(sample_names)
+
+names(absent_num) <- sample_names
+absent_num <- as.data.frame(absent_num)
+absent_num <- cbind(sample_names, absent_num)
+```
+
+##testing only,
+```{r}
+
+head(absent_num)
+absent_num_dist <- dist(as.matrix(absent_num), method = "manhattan")
+
+
+plot(ape::nj(absent_num_dist))
+```
+
+
+
+## Plotting total number of absent genes per isolate and also by gene categories
+```{r}
+
+library("ggplot2")
+library("forcats")
+
+absent_plot <- ggplot(data = absent_num, aes(x = fct_inorder(sample_names), y = absent_num)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  labs(x = "Samples", y = "Number of absent genes") +
+  theme(axis.text = element_text(size = 12)) 
+  
+
+absent_plot + coord_flip()
+
+
+rownames(prs_abs) <- sample_names
+prs_abs <- cbind(sample_names, prs_abs)
+head(prs_abs) 
+
+
+library(reshape)
+prs_abs <- melt(prs_abs, id = c('sample_names'))
+
+ggplot(prs_abs, aes(x=fct_inorder(sample_names), y = value)) + 
+  geom_bar(stat = "identity") + facet_grid(variable~., scales = "free") +
+   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  labs(x = "Samples", y = "Number of absent genes")
+
+
+```
+
+
+```{r, echo=FALSE, fig.align="center", fig.height=16, fig.width=16}
+
+## Grouping of the samples 
+
+head(absent_num)
+
+mir <- absent_num[grep("mir|P7722", absent_num$sample_names), ]
+ipo <- absent_num[grep("ipo", absent_num$sample_names), ]
+pinf_mx <- absent_num[grep("inf|P10650", absent_num$sample_names), ]
+pinf_clonal <- absent_num[grep("us|P10127|IN2009T1|RS2009P1|BL2009", absent_num$sample_names), ]
+pinf_SA <- absent_num[grep("P13527|P13626", absent_num$sample_names), ]
+pinf_Euro <- absent_num[grep("blue|P12204|NL07434", absent_num$sample_names),]
+pinf_us1 <- absent_num[grep("P6096|LB|P11633|DDR", absent_num$sample_names),]
+
+
+Pipo <- as.numeric(ipo$absent_num)
+Pmir <- as.numeric(mir$absent_num)
+Pinf_MX <- as.numeric(pinf_mx$absent_num)
+Pinf_clonal <- as.numeric(pinf_clonal$absent_num)
+Pinf_SA <- as.numeric(pinf_SA$absent_num)
+Pinf_Euro <- as.numeric(pinf_Euro$absent_num)
+Pinf_US1 <- as.numeric(pinf_us1$absent_num)
+
+Pipo.df <- data.frame(Pipo, rep("P.ipo", length(Pipo)))
+colnames(Pipo.df) <- c("absent", "Group")
+
+Pmir.df <- data.frame(Pmir,rep("P.mir", length(Pmir)))
+colnames(Pmir.df) <- c("absent", "Group")
+
+Pinf_MX.df <- data.frame(Pinf_MX, rep("P.inf_MX", length(Pinf_MX)))
+colnames(Pinf_MX.df) <- c("absent", "Group")
+
+Pinf_clonal.df <- data.frame(Pinf_clonal,rep("P.inf_clonal", length(Pinf_clonal)))
+colnames(Pinf_clonal.df) <- c("absent", "Group")
+
+Pinf_SA.df <- data.frame(Pinf_SA, rep("P.inf_SA", length(Pinf_SA)))
+colnames(Pinf_SA.df) <- c("absent", "Group")
+
+Pinf_US1.df <- data.frame(Pinf_US1, rep("P.inf_US1", length(Pinf_US1)))
+colnames(Pinf_US1.df) <- c("absent", "Group")
+
+Pinf_Euro.df <- data.frame(Pinf_Euro, rep("P.inf_Euro", length(Pinf_Euro)))
+colnames(Pinf_Euro.df) <- c("absent", "Group")
+
+absent.df <- rbind(Pinf_US1.df, Pinf_clonal.df, Pinf_MX.df, Pinf_SA.df, Pinf_Euro.df, Pmir.df, Pipo.df)
+
+ggplot(absent.df, aes(x=Group, y = absent)) + geom_boxplot(aes(fill = factor(Group))) +
+  theme(axis.text.x = element_text(size = rel(2))) +
+  theme(axis.text.y = element_text(size = rel(2))) + theme(strip.text = element_text(size = 25))
+
+sig <- aov(absent ~ Group, absent.df)
+
+summary(sig)
+
+
+head(prs_abs)
+
+
+mir <- prs_abs[grep("mir|P7722", prs_abs$sample_names),]
+ipo <- prs_abs[grep("ipo", prs_abs$sample_names),]
+pinf_mx <- prs_abs[grep("inf|P10650", prs_abs$sample_names),]
+pinf_clonal <- prs_abs[grep("us|P10127|IN2009T1|RS2009P1|BL2009", prs_abs$sample_names),]
+pinf_SA <- prs_abs[grep("P13527|P13626", prs_abs$sample_names),]
+pinf_Euro <- prs_abs[grep("blue|P12204|NL07434", prs_abs$sample_names),]
+pinf_us1 <- prs_abs[grep("P6096|LB|P11633|DDR", prs_abs$sample_names),]
+
+
+
+Pmir.df <- data.frame(mir,rep("P.mir", length(mir)))
+colnames(Pmir.df) <- c("samples", "Category", "Count", "Group")
+
+
+Pipo.df <- data.frame(ipo,rep("P.ipo", length(ipo)))
+colnames(Pipo.df) <- c("samples", "Category", "Count", "Group")
+
+
+pinf_mx.df <- data.frame(pinf_mx,rep("P.inf_MX", length(pinf_mx)))
+colnames(pinf_mx.df) <- c("samples", "Category", "Count", "Group")
+
+pinf_clonal.df <- data.frame(pinf_clonal,rep("P.inf_clonal", length(pinf_clonal)))
+colnames(pinf_clonal.df) <- c("samples", "Category", "Count", "Group")
+
+pinf_SA.df <- data.frame(pinf_SA,rep("P.inf_SA", length(pinf_SA)))
+colnames(pinf_SA.df) <- c("samples", "Category", "Count", "Group")
+
+pinf_Euro.df <- data.frame(pinf_Euro, rep("P.inf_Euro", length(pinf_Euro)))
+colnames(pinf_Euro.df) <- c("samples", "Category", "Count", "Group")
+
+pinf_us1.df <- data.frame(pinf_us1, rep("P.inf_US1", length(pinf_us1)))
+colnames(pinf_us1.df) <- c("samples", "Category", "Count", "Group")
+
+
+all.df <- data.frame(rbind(pinf_us1.df, pinf_clonal.df, pinf_mx.df, pinf_SA.df, pinf_Euro.df, Pmir.df, Pipo.df))
+
+
+
+
+# ggplot(all.df, aes(x=Group, y = Count)) + geom_point(aes(colour = factor(Group))) + facet_wrap(~Category, scales = "free")
+
+
+library(ggplot2)
+ggplot(all.df, aes(x=Group, y = Count)) + geom_boxplot(aes(fill = factor(Group))) + facet_wrap(~Category, scales = "free") + 
+   theme(axis.text.x = element_text(size = rel(2), angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(axis.text.y = element_text(size = rel(2))) +
+  theme(strip.text = element_text(size = 25))
+
+head(all.df)
+
+
+ggplot(all.df, aes(x=Group, y = Count)) + facet_wrap(~Category, scales = "free") + geom_jitter(aes(colour = factor(Group), size = 3)) +
+   theme(axis.text.x = element_text(size = rel(2), angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(axis.text.y = element_text(size = rel(2))) +
+  theme(strip.text = element_text(size = 25))
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
