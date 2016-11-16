@@ -51,8 +51,6 @@ for (k in 1:length){
 
 
 ```
-
-
 ## Looping through list of pitgs to convert from vcf to dnabin
 
 ```{r}
@@ -95,3 +93,4 @@ for (j in 1:length(pitglist)){
 }
 
 names(trees) <- pitglist
+pitglist
