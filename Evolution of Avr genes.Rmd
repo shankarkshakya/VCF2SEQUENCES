@@ -258,9 +258,9 @@ library(reshape2)
 
 melt_avr_nt_div_mat <- melt(avr_nt_div_mat)
 
-
+library(ggplot2)
 dat1 <- ggplot(melt_avr_nt_div_mat, aes(x=fct_inorder(Var2), y = value)) + geom_boxplot() + labs(title = "Nucleotide diversity for conserved Avr genes")
-
+dat1
 
 ```
 
@@ -537,7 +537,7 @@ colnames(gene_poly_perfamily) <- c("Gene family", "P/A")
 
 gene_poly_perfamily <- gene_poly_perfamily[order(gene_poly_perfamily$`P/A`, decreasing = TRUE), ]
 
-gene_poly_perfamily
+head(gene_poly_perfamily)
 
 #heatmap.bp(ind_fami[[1]])
 
@@ -545,37 +545,35 @@ gene_poly_perfamily
 ```
 
 
-## Ramos-Onsins–Rozas Test of Neutrality
+## Tajima's D test for neutrality
 
-```{r}
+```{r, echo=TRUE}
 
-mybin #dnabin of avr genes
-control_mybin # dnabin of control genes
+# mybin #dnabin of avr genes
+# control_mybin # dnabin of control genes
 
-length(mybin)
-length(control_mybin)
+# length(mybin)
+# length(control_mybin)
 
-avr_tajima_mat <- matrix(NA, nrow = length(mybin), ncol = 3)
+avr_tajima_mat <- matrix(NA, nrow = length(mybin), ncol = 4)
 rownames(avr_tajima_mat) <- names(mybin)
-colnames(avr_tajima_mat) <- c("Tajima's D", "Pvalue", "Segregating sites")
-avr_tajima_mat
+colnames(avr_tajima_mat) <- c("Tajima's D", "Pvalue", "Segregating sites", "gene length")
+#avr_tajima_mat
 
 for (i in 1:length(mybin)){
   tajima <- tajima.test(mybin[[i]])
   avr_tajima_mat[i,1] <- tajima$D
   avr_tajima_mat[i,2] <- tajima$Pval.normal
   avr_tajima_mat[i,3] <- length(seg.sites(mybin[[i]]))
-  
-   #print(theta.s(mybin[[i]]))
-  
+  avr_tajima_mat[i,4] <- ncol(mybin[[i]])
+
 }
-
-
+avr_tajima_mat
 
 control_tajima_mat <- matrix(NA, nrow = length(control_mybin), ncol = 4)
 rownames(control_tajima_mat) <- names(control_mybin)
 colnames(control_tajima_mat) <- c("Tajima's D", "Pvalue", "Segregating sites", "gene length")
-control_tajima_mat
+#control_tajima_mat
 
 for (i in 1:length(control_mybin)){
   tajima <- tajima.test(control_mybin[[i]])
@@ -583,7 +581,7 @@ for (i in 1:length(control_mybin)){
   control_tajima_mat[i,1] <- tajima$D
   control_tajima_mat[i,2] <- tajima$Pval.normal
   control_tajima_mat[i,3] <- length(seg.sites(control_mybin[[i]]))
-  control_tajima_mat[i,4] <- ncol(mybin[[i]])
+  control_tajima_mat[i,4] <- ncol(control_mybin[[i]])
 }
 
 control_tajima_mat
@@ -638,7 +636,7 @@ checkAlignment(dna_seq)
 
 
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 
 
 mybin[[1]]
