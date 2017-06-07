@@ -1,0 +1,63 @@
+---
+title: "Untitled"
+author: "Shankar K Shakya"
+date: "April 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(vcfR, quietly = TRUE)
+new_cnv <- read.vcfR("pitg_cnv_20170518.vcf.gz", verbose = FALSE)
+
+aard <- extract.gt(new_cnv, element = "AARD", as.numeric = T)
+maard <- apply(aard, MARGIN = 2, mean, na.rm  = TRUE)
+#hist(maard)
+
+new_cnv@gt <- new_cnv@gt[, c(TRUE, maard >= 12)]
+
+boc <- extract.gt(new_cnv, element = "BOC", as.numeric = T)
+zsc <- extract.gt(new_cnv, element = "ZSC", as.numeric = T)
+
+
+mybin <- load("New_DNAbin_conserved_genes_BOC_ZERO.RData") #DNA seq for all gene categories
+mybin <- get(mybin[[1]])
+
+samples_name <- labels(mybin$RxLR$PITG_00366)
+samples_name <- as.list(samples_name)
+samples_name <- lapply(samples_name, function(x) strsplit(x, "_"))
+samples_name <- lapply(samples_name, function(x)x[[1]][1])
+samples_name <- unlist(samples_name[seq(1, length(samples_name), by = 2)])
+
+colnames(boc)
+
+boc_samples <- boc[, as.character(samples_name)]
+abp_samples <- abp[, as.character(samples_name)]
+zsc_samples <- zsc[, as.character(samples_name)]
+
+
+for (i in 1:nrow(boc_samples)){
+  
+  for (j in 1:ncol(boc_samples)){
+    
+    if (boc_samples[i,j] > 0 & zsc_samples[i,j] >= 0){
+      abp_samples[i,j] <- abp_samples[i,j]
+      
+    } else{
+      
+      abp_samples[i,j] <- 0
+      
+    }
+    
+    
+  }
+  
+}
+
+
+```
+
